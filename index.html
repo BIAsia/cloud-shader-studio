@@ -156,10 +156,12 @@
       <div class="row"><label>Opacity</label><input type="range" id="ovlOpacity" min="0" max="100" step="1"><input type="number" class="num" id="ovlOpacityN" min="0" max="100"></div>
     </div>
     <div class="footer">
-      <button id="copyKf">Copy keyframe</button>
+      <button id="exportBtn">Export</button>
+      <button id="importBtn">Import</button>
       <button id="swap">Swap S/E</button>
       <div class="spacer"></div>
       <label>Duration <input id="dur" class="dur" type="number" value="5" step="0.5"> s</label>
+      <input type="file" id="importFile" accept="application/json,.json" style="display:none">
     </div>
     <div class="tip">Toggle <b>Start</b>/<b>End</b> to edit that keyframe with the sliders; the preview shows it. Press <b>Play</b> (or scrub) to see the linear morph between them.</div>
   </div>
@@ -174,9 +176,9 @@ const START = {
   phase:0, churn:100, scale:81, offsetX:100, offsetY:50, angle:0,
 };
 const END = {
-  cloudColor:'#c5ac9d', shadowColor:'#007bff',
+  cloudColor:'#c5ac9d', shadowColor:'#00359e',
   skyTop:'#a8caeb', skyMid:'#e5b88f', skyBottom:'#ef7851',
-  coverage:45, density:73, brightness:72, detail:67, variation:9,
+  coverage:45, density:73, brightness:46, detail:32, variation:9,
   warpAmount:0, warpScale:0, stretch:0,
   phase:10, churn:100, scale:81, offsetX:100, offsetY:50, angle:0,
 };
@@ -259,11 +261,45 @@ tabStart.onclick=()=>setEditing('start');
 tabEnd.onclick=()=>setEditing('end');
 
 document.getElementById('swap').onclick=()=>{ const t=KF.start; KF.start=KF.end; KF.end=t; syncControls(); };
-document.getElementById('copyKf').onclick=()=>{
-  navigator.clipboard.writeText(JSON.stringify(KF[editing],null,2)).then(()=>{
-    const b=document.getElementById('copyKf'); const o=b.textContent; b.textContent='Copied ✓'; setTimeout(()=>b.textContent=o,1000);
-  });
+// ---------- export / import the full parameter set ----------
+function flash(btn,msg){ const o=btn.textContent; btn.textContent=msg; setTimeout(()=>btn.textContent=o,1100); }
+function collectState(){
+  return { app:'cloud-shader-studio', version:1, duration:dur(),
+    start:{...KF.start}, end:{...KF.end},
+    overlay:{ enable:ovlOn.checked, type:ovlType.value, blend:ovlBlend.value,
+      c1:ovlState.c1, c2:ovlState.c2, angle:ovlState.angle, opacity:ovlState.opacity, imageUrl:ovlState.imageUrl } };
+}
+function applyState(s){
+  if(s.start) KF.start=Object.assign({...START}, s.start);
+  if(s.end)   KF.end  =Object.assign({...END},   s.end);
+  if(s.duration!=null) durInp.value=s.duration;
+  if(s.overlay){ const o=s.overlay;
+    if(o.c1!=null){ ovlState.c1=o.c1; ovlC1.value=o.c1; ovlC1Hex.value=o.c1.toUpperCase(); }
+    if(o.c2!=null){ ovlState.c2=o.c2; ovlC2.value=o.c2; ovlC2Hex.value=o.c2.toUpperCase(); }
+    if(o.angle!=null){ ovlState.angle=o.angle; ovlAngle.value=o.angle; ovlAngleN.value=o.angle; }
+    if(o.opacity!=null){ ovlState.opacity=o.opacity; ovlOpacity.value=o.opacity; ovlOpacityN.value=o.opacity; }
+    if(o.imageUrl!==undefined) ovlState.imageUrl=o.imageUrl;
+    if(o.type) ovlType.value=o.type;
+    if(o.blend) ovlBlend.value=o.blend;
+    if(o.enable!=null) ovlOn.checked=o.enable;
+    applyOverlay();
+  }
+  syncControls();
+}
+const exportBtn=document.getElementById('exportBtn'), importBtn=document.getElementById('importBtn'), importFile=document.getElementById('importFile');
+exportBtn.onclick=()=>{
+  const blob=new Blob([JSON.stringify(collectState(),null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='cloud-shader-'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.json';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+  flash(exportBtn,'Exported ✓');
 };
+importBtn.onclick=()=>importFile.click();
+importFile.addEventListener('change',(e)=>{ const f=e.target.files[0]; if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{ try{ applyState(JSON.parse(rd.result)); flash(importBtn,'Imported ✓'); }
+    catch(err){ flash(importBtn,'Invalid file'); } };
+  rd.readAsText(f); importFile.value=''; });
 
 // ---------- overlay (image / gradient with blend mode, on top of the cloud render) ----------
 const ovl=document.getElementById('overlay');
@@ -273,7 +309,7 @@ const ovlC1=document.getElementById('ovlC1'), ovlC1Hex=document.getElementById('
 const ovlC2=document.getElementById('ovlC2'), ovlC2Hex=document.getElementById('ovlC2Hex');
 const ovlAngle=document.getElementById('ovlAngle'), ovlAngleN=document.getElementById('ovlAngleN');
 const ovlOpacity=document.getElementById('ovlOpacity'), ovlOpacityN=document.getElementById('ovlOpacityN');
-const ovlState={ c1:'#858dff', c2:'#ffb22e', angle:180, opacity:55, imageUrl:null };
+const ovlState={ c1:'#c2c6ff', c2:'#caff9e', angle:194, opacity:55, imageUrl:null };
 ovlC1.value=ovlState.c1; ovlC1Hex.value=ovlState.c1.toUpperCase();
 ovlC2.value=ovlState.c2; ovlC2Hex.value=ovlState.c2.toUpperCase();
 ovlAngle.value=ovlState.angle; ovlAngleN.value=ovlState.angle;
