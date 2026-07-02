@@ -6,121 +6,180 @@
 <title>Cloud Shader Studio</title>
 <style>
   :root{
-    --bg:#eceef2; --panel:#ffffff; --panel2:#f3f4f7; --line:#e5e7ec;
-    --text:#1b1e24; --muted:#767c88; --accent:#2f6bff; --accent-soft:rgba(47,107,255,.14);
-    --shadow:rgba(22,27,38,.13); --hud-bg:rgba(255,255,255,.72); --hud-text:#1b1e24;
-    --stage:radial-gradient(130% 120% at 50% 0%, #f5f7fa, #e6e9ef);
+    --sans:"Helvetica Neue",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Roboto Mono",Menlo,Consolas,monospace;
+    /* neutral grayscale (no hue); both columns share one flat background */
+    --bg:#eae9e8; --panel:#eae9e8; --ink:#1a1a1a; --muted:#6c6c6c;
+    --line:rgba(0,0,0,.15); --hair:rgba(0,0,0,.07); --inkfill:#1a1a1a;
+    --field:transparent; --sel:#f6f5f4; --hud-bg:rgba(234,233,232,.82);
+    --ease:cubic-bezier(.2,.8,.2,1);
     color-scheme:light;
   }
   :root[data-theme="dark"]{
-    --bg:#0e0f12; --panel:#15171d; --panel2:#1d2028; --line:#2a2e38;
-    --text:#e8eaef; --muted:#969ca8; --accent:#5b8cff; --accent-soft:rgba(91,140,255,.20);
-    --shadow:rgba(0,0,0,.5); --hud-bg:rgba(18,20,26,.58); --hud-text:#e8eaef;
-    --stage:radial-gradient(130% 120% at 50% 0%, #1a1c22, #0b0c0f);
+    --bg:#0f0f0f; --panel:#0f0f0f; --ink:#ededed; --muted:#8a8a8a;
+    --line:rgba(255,255,255,.15); --hair:rgba(255,255,255,.07); --inkfill:#ededed;
+    --field:transparent; --sel:#0f0f0f; --hud-bg:rgba(15,15,15,.72);
     color-scheme:dark;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
-  body{
-    background:var(--bg); color:var(--text);
-    font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    display:flex; height:100vh; overflow:hidden; -webkit-font-smoothing:antialiased;
-  }
-  #stage{ flex:1; display:flex; align-items:center; justify-content:center; padding:28px; background:var(--stage); min-width:0 }
-  #canvasWrap{ position:relative; height:100%; aspect-ratio:3/4; max-width:100%; border-radius:16px; overflow:hidden;
-    box-shadow:0 24px 60px -14px var(--shadow), 0 0 0 1px var(--line) }
+  body{ background:var(--bg); color:var(--ink); font-family:var(--mono); font-size:12px; line-height:1.5;
+    display:flex; height:100vh; overflow:hidden; -webkit-font-smoothing:antialiased; }
+
+  /* ---- stage / preview ---- */
+  #stage{ flex:1; display:flex; align-items:center; justify-content:center; padding:30px 34px; min-width:0 }
+  .canvas-col{ display:flex; flex-direction:column; gap:9px; height:100%; max-height:100% }
+  .cap{ display:flex; justify-content:space-between; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted) }
+  #canvasWrap{ position:relative; flex:1; min-height:0; aspect-ratio:3/4; border:1px solid var(--line) }
   canvas{display:block; width:100%; height:100%}
   #overlay{position:absolute; inset:0; pointer-events:none; mix-blend-mode:soft-light; background-size:cover; background-position:center; background-repeat:no-repeat}
+  .tk{position:absolute; width:9px; height:9px; pointer-events:none}
+  .tk-tl{top:-1px;left:-1px;border-top:1px solid var(--ink);border-left:1px solid var(--ink)}
+  .tk-tr{top:-1px;right:-1px;border-top:1px solid var(--ink);border-right:1px solid var(--ink)}
+  .tk-bl{bottom:-1px;left:-1px;border-bottom:1px solid var(--ink);border-left:1px solid var(--ink)}
+  .tk-br{bottom:-1px;right:-1px;border-bottom:1px solid var(--ink);border-right:1px solid var(--ink)}
 
-  /* HUD */
-  #hud{ position:absolute; left:14px; right:14px; bottom:14px; display:flex; align-items:center; gap:6px;
-    background:var(--hud-bg); -webkit-backdrop-filter:blur(16px) saturate(1.4); backdrop-filter:blur(16px) saturate(1.4);
-    border:1px solid var(--line); border-radius:13px; padding:7px; color:var(--hud-text) }
-  #hud button{ background:transparent; color:var(--hud-text); border:none; border-radius:8px; padding:6px 11px;
-    cursor:pointer; font:inherit; font-weight:600; white-space:nowrap; transition:background .15s }
-  #hud button:hover{ background:color-mix(in srgb, var(--hud-text) 10%, transparent) }
-  #hud #play{ background:var(--accent); color:#fff }
-  #hud #play:hover{ filter:brightness(1.07) }
-  #hud input[type=range]{flex:1; min-width:40px}
-  #tval{width:50px; text-align:right; color:var(--muted); font-variant-numeric:tabular-nums; font-size:12px}
+  /* ---- HUD ---- */
+  #hud{ position:absolute; left:0; right:0; bottom:0; display:flex; align-items:center; gap:2px;
+    background:var(--hud-bg); -webkit-backdrop-filter:blur(14px) saturate(1.3); backdrop-filter:blur(14px) saturate(1.3);
+    border-top:1px solid var(--line); padding:7px 9px; color:var(--ink) }
+  #hud button{ background:none; border:none; color:var(--ink); font-family:var(--mono); font-size:10px; letter-spacing:.06em;
+    text-transform:uppercase; padding:5px 7px; cursor:pointer; transition:opacity .13s var(--ease), transform .08s var(--ease) }
+  #hud button:hover{opacity:.55} #hud button:active{transform:translateY(1px)}
+  #hud #play{font-weight:700; letter-spacing:.1em}
+  #hud input[type=range]{flex:1; margin:0 8px}
+  #tval{width:44px; text-align:right; color:var(--muted); font-size:10px; font-variant-numeric:tabular-nums}
 
-  /* Panel */
-  #panel{width:366px; flex:none; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; height:100%}
-  .phead{padding:15px 18px 14px; border-bottom:1px solid var(--line)}
-  .phead-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:13px}
-  .phead h1{font-size:14px; margin:0; font-weight:650; letter-spacing:-.01em}
-  .theme-btn{ background:var(--panel2); color:var(--muted); border:1px solid var(--line); border-radius:8px; padding:5px 11px;
-    cursor:pointer; font:inherit; font-size:12px; font-weight:500; transition:color .15s, border-color .15s }
-  .theme-btn:hover{ color:var(--text); border-color:var(--accent) }
-  .seg{display:flex; background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:3px; gap:2px}
-  .seg button{flex:1; background:transparent; border:none; color:var(--muted); padding:6px 8px; border-radius:6px; cursor:pointer; font:inherit; font-weight:600; transition:color .15s, background .15s}
-  .seg button:hover{color:var(--text)}
-  .seg button.on{background:var(--accent); color:#fff}
+  /* ---- panel ---- */
+  #panel{width:384px; flex:none; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; height:100%}
+  .phead{padding:18px 20px 14px; border-bottom:1px solid var(--line)}
+  .phead-top{display:flex; align-items:baseline; justify-content:space-between}
+  .brand{display:flex; align-items:baseline; gap:9px}
+  .phead h1{font-family:var(--sans); font-size:19px; font-weight:800; letter-spacing:-.02em; text-transform:uppercase; margin:0; line-height:1}
+  .brand .mk{font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted)}
+  .metaline{display:flex; justify-content:space-between; margin:10px 0 14px; font-size:9px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted)}
+  .theme-btn{ background:none; border:1px solid var(--line); color:var(--muted); font-family:var(--mono); font-size:9.5px;
+    letter-spacing:.1em; text-transform:uppercase; padding:4px 9px; cursor:pointer;
+    transition:color .14s var(--ease), border-color .14s var(--ease), transform .08s var(--ease) }
+  .theme-btn:hover{color:var(--ink); border-color:var(--ink)} .theme-btn:active{transform:translateY(1px)}
 
-  #rows{overflow-y:auto; flex:1; padding:8px 18px 16px}
-  .grp{margin:17px 0 9px; color:var(--muted); font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.07em}
-  .row,.crow{display:flex; align-items:center; gap:12px; padding:5px 0}
-  .row > label, .crow > label{width:98px; flex:none; font-size:12.5px; color:var(--text)}
+  .seg{display:flex; border:1px solid var(--line)}
+  .seg button{flex:1; background:none; border:none; border-right:1px solid var(--line); color:var(--muted);
+    font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; padding:8px; cursor:pointer;
+    transition:background .17s var(--ease), color .17s var(--ease), transform .08s var(--ease) }
+  .seg button:last-child{border-right:none}
+  .seg button:hover{color:var(--ink)} .seg button:active{transform:translateY(1px)}
+  .seg button.on{background:var(--ink); color:var(--sel)}
+
+  #rows{overflow-y:auto; flex:1; padding:2px 20px 12px}
+  .grp{display:flex; align-items:center; gap:11px; margin:18px 0 3px; font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
+  .grp::after{content:""; flex:1; height:1px; background:var(--line)}
+  .row,.crow{display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--hair)}
+  .row > label, .crow > label{width:106px; flex:none; font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted)}
   .spacer{flex:1}
 
-  /* range slider */
-  input[type=range]{ -webkit-appearance:none; appearance:none; flex:1; height:18px; background:transparent; cursor:pointer }
-  input[type=range]::-webkit-slider-runnable-track{height:4px; border-radius:999px; background:var(--line)}
-  input[type=range]::-moz-range-track{height:4px; border-radius:999px; background:var(--line)}
-  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; margin-top:-5px; width:14px; height:14px; border-radius:50%;
-    background:#fff; border:1px solid var(--line); box-shadow:0 1px 2px var(--shadow); transition:border-color .15s, box-shadow .15s }
-  input[type=range]::-moz-range-thumb{ width:14px; height:14px; border:1px solid var(--line); border-radius:50%; background:#fff; box-shadow:0 1px 2px var(--shadow) }
-  input[type=range]:hover::-webkit-slider-thumb{border-color:var(--accent)}
+  /* thin-line range */
+  input[type=range]{ --p:50%; -webkit-appearance:none; appearance:none; flex:1; height:16px; background:none; cursor:pointer }
+  input[type=range]::-webkit-slider-runnable-track{height:1px; background:linear-gradient(var(--inkfill),var(--inkfill)) 0/var(--p) 100% no-repeat, var(--line)}
+  input[type=range]::-moz-range-track{height:1px; background:var(--line)}
+  input[type=range]::-moz-range-progress{height:1px; background:var(--inkfill)}
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; margin-top:-4px; width:9px; height:9px; border-radius:50%;
+    background:var(--inkfill); transition:transform .12s var(--ease) }
+  input[type=range]::-moz-range-thumb{ width:9px; height:9px; border:none; border-radius:50%; background:var(--inkfill) }
+  input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.4)}
+  input[type=range]:active::-webkit-slider-thumb{transform:scale(1.7)}
   input[type=range]:focus-visible{outline:none}
-  input[type=range]:focus-visible::-webkit-slider-thumb{border-color:var(--accent); box-shadow:0 0 0 4px var(--accent-soft)}
 
-  /* number / text / select fields */
-  .num,.hex,.dur,.ovl select{ background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:7px;
-    padding:6px 8px; font:inherit; transition:border-color .15s, box-shadow .15s }
-  .num{width:56px; flex:none; text-align:right; font-variant-numeric:tabular-nums}
-  .hex{flex:1; text-transform:uppercase; letter-spacing:.02em}
-  .num:focus,.hex:focus,.dur:focus,.ovl select:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
+  /* number / hex / select — underline fields */
+  .num,.hex,.dur,.ovl select{ background:var(--field); border:none; border-bottom:1px solid var(--line); color:var(--ink);
+    font-family:var(--mono); font-size:11px; padding:4px 1px; transition:border-color .14s var(--ease) }
+  .num{width:46px; flex:none; text-align:right; font-variant-numeric:tabular-nums}
+  .hex{flex:1; text-transform:uppercase; letter-spacing:.04em}
+  .num:hover,.hex:hover,.dur:hover,.ovl select:hover{border-color:var(--muted)}
+  .num:focus,.hex:focus,.dur:focus,.ovl select:focus{outline:none; border-color:var(--ink)}
 
-  /* color swatch */
-  input[type=color]{ -webkit-appearance:none; appearance:none; width:30px; height:28px; flex:none; padding:0;
-    border:1px solid var(--line); border-radius:7px; background:none; cursor:pointer }
-  input[type=color]::-webkit-color-swatch-wrapper{padding:3px}
-  input[type=color]::-webkit-color-swatch{border:none; border-radius:4px}
-  input[type=color]::-moz-color-swatch{border:none; border-radius:4px}
+  /* color swatch — the only colour in the UI (native appearance kept so the picker opens) */
+  input[type=color]{ width:28px; height:20px; flex:none; padding:2px; border:1px solid var(--line); background:var(--panel);
+    cursor:pointer; transition:box-shadow .14s var(--ease), transform .1s var(--ease) }
+  input[type=color]:hover{box-shadow:0 0 0 2px var(--panel), 0 0 0 3px var(--ink)}
+  input[type=color]:active{transform:scale(.92)}
+  input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+  input[type=color]::-webkit-color-swatch{border:1px solid var(--hair)}
+  input[type=color]::-moz-color-swatch{border:none}
+
+  /* custom dropdown (replaces native <select> so the open menu matches the theme) */
+  .sel{position:relative; flex:1}
+  .sel-btn{ width:100%; display:flex; align-items:center; gap:8px; background:none; border:none; border-bottom:1px solid var(--line);
+    color:var(--ink); font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; padding:4px 1px;
+    cursor:pointer; transition:border-color .14s var(--ease) }
+  .sel-btn .sel-val{flex:1; text-align:left}
+  .sel-btn .sel-chev{font-size:8px; color:var(--muted); transition:transform .18s var(--ease)}
+  .sel-btn:hover{border-color:var(--muted)} .sel.open .sel-btn{border-color:var(--ink)}
+  .sel.open .sel-chev{transform:rotate(180deg)}
+  .sel-menu{ position:absolute; left:0; right:0; top:calc(100% + 5px); z-index:40; background:var(--panel); border:1px solid var(--ink);
+    opacity:0; transform:translateY(-4px); pointer-events:none; transition:opacity .14s var(--ease), transform .14s var(--ease) }
+  .sel.open .sel-menu{opacity:1; transform:none; pointer-events:auto}
+  .sel-opt{ padding:7px 9px; font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink);
+    cursor:pointer; transition:background .1s var(--ease), color .1s var(--ease) }
+  .sel-opt:hover, .sel-opt[aria-selected="true"]{background:var(--ink); color:var(--sel)}
+
+  /* collapsible sections */
+  .sec{border-bottom:1px solid var(--hair)}
+  .sec-head{ width:100%; display:flex; align-items:center; gap:10px; background:none; border:none; color:var(--muted);
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; padding:13px 0 9px; cursor:pointer;
+    transition:color .14s var(--ease) }
+  .sec-head:hover{color:var(--ink)}
+  .sec-head .rule{flex:1; height:1px; background:var(--line)}
+  .sec-head .sec-chev{font-size:8px; color:var(--muted); transition:transform .22s var(--ease)}
+  .sec.open .sec-chev{transform:rotate(90deg)}
+  .sec-body{display:grid; grid-template-rows:0fr; transition:grid-template-rows .26s var(--ease)}
+  .sec.open > .sec-body{grid-template-rows:1fr}
+  .sec-inner{overflow:hidden; min-height:0}
 
   /* checkbox */
-  input[type=checkbox]{width:16px; height:16px; accent-color:var(--accent); cursor:pointer}
+  input[type=checkbox]{ appearance:none; -webkit-appearance:none; width:15px; height:15px; border:1px solid var(--line);
+    background:var(--field); cursor:pointer; position:relative; transition:border-color .14s var(--ease), background .14s var(--ease), transform .08s var(--ease) }
+  input[type=checkbox]:hover{border-color:var(--ink)}
+  input[type=checkbox]:active{transform:scale(.88)}
+  input[type=checkbox]:checked{background:var(--ink); border-color:var(--ink)}
+  input[type=checkbox]:checked::after{content:""; position:absolute; left:4px; top:1px; width:4px; height:8px; border:solid var(--sel); border-width:0 1.5px 1.5px 0; transform:rotate(45deg)}
 
-  /* overlay section */
-  .ovl{padding:8px 18px 6px; border-top:1px solid var(--line)}
-  .ovl select{flex:1; appearance:none; -webkit-appearance:none; padding-right:26px;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat:no-repeat; background-position:right 9px center }
-  .ovl .file{flex:1; background:var(--panel2); border:1px dashed var(--line); color:var(--muted); border-radius:7px;
-    padding:7px 8px; font:inherit; cursor:pointer; text-align:center; transition:border-color .15s, color .15s }
-  .ovl .file:hover{border-color:var(--accent); color:var(--text)}
+  /* overlay section (sibling of #rows so its dropdown menus aren't clipped by the scroll) */
+  .ovl-sec{padding:0 20px; border-top:1px solid var(--line)}
+  .file{flex:1; background:none; border:1px dashed var(--line); color:var(--muted); font-family:var(--mono); font-size:10px;
+    letter-spacing:.05em; text-transform:uppercase; padding:7px; cursor:pointer; text-align:center;
+    transition:border-color .14s var(--ease), color .14s var(--ease), transform .08s var(--ease) }
+  .file:hover{border-color:var(--ink); color:var(--ink)} .file:active{transform:translateY(1px)}
 
   /* footer */
-  .footer{padding:12px 18px; border-top:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap}
-  .footer button{background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:7px 11px; cursor:pointer; font:inherit; transition:border-color .15s}
-  .footer button:hover{border-color:var(--accent)}
-  .footer label{display:flex; align-items:center; gap:6px; color:var(--muted)}
-  .tip{color:var(--muted); font-size:11.5px; line-height:1.5; padding:2px 18px 14px}
+  .footer{padding:14px 20px; border-top:1px solid var(--line); display:flex; gap:16px; align-items:center; flex-wrap:wrap}
+  .footer button{ background:none; border:none; color:var(--ink); font-family:var(--mono); font-size:10.5px; letter-spacing:.07em;
+    text-transform:uppercase; padding:2px 0; cursor:pointer; position:relative; transition:transform .08s var(--ease) }
+  .footer button::after{content:""; position:absolute; left:0; right:100%; bottom:-3px; height:1px; background:var(--ink); transition:right .22s var(--ease)}
+  .footer button:hover::after{right:0}
+  .footer button:active{transform:translateY(1px)}
+  .footer label{display:flex; align-items:center; gap:7px; color:var(--muted); font-size:10px; letter-spacing:.06em; text-transform:uppercase}
+  .dur{width:38px; text-align:right}
+  .tip{color:var(--muted); font-size:10px; line-height:1.6; letter-spacing:.02em; padding:0 20px 16px}
+  .tip b{color:var(--ink); font-weight:400; text-decoration:underline; text-underline-offset:2px}
 
   @media (prefers-reduced-motion: reduce){ *{transition:none!important} }
 </style>
 </head>
 <body>
   <div id="stage">
-    <div id="canvasWrap">
-      <canvas id="gl"></canvas>
-      <div id="overlay"></div>
-      <div id="hud">
-        <button id="play">► Play</button>
-        <button id="loop" class="ghost">Loop: on</button>
-        <button id="seamless" class="ghost">Seamless: on</button>
-        <input id="scrub" type="range" min="0" max="1" step="0.001" value="0" />
-        <span id="tval">0.00s</span>
+    <div class="canvas-col">
+      <div id="canvasWrap">
+        <canvas id="gl"></canvas>
+        <div id="overlay"></div>
+        <span class="tk tk-tl"></span><span class="tk tk-tr"></span><span class="tk tk-bl"></span><span class="tk tk-br"></span>
+        <div id="hud">
+          <button id="play">► Play</button>
+          <button id="loop" class="ghost">Loop: on</button>
+          <button id="seamless" class="ghost">Seamless: on</button>
+          <input id="scrub" type="range" min="0" max="1" step="0.001" value="0" />
+          <span id="tval">0.00s</span>
+        </div>
       </div>
     </div>
   </div>
@@ -128,7 +187,7 @@
   <div id="panel">
     <div class="phead">
       <div class="phead-top">
-        <h1>Cloud Shader Studio</h1>
+        <div class="brand"><h1>Cloud Shader</h1><span class="mk">Studio</span></div>
         <button id="themeBtn" class="theme-btn" title="Toggle light / dark">Dark</button>
       </div>
       <div class="seg">
@@ -137,33 +196,28 @@
       </div>
     </div>
     <div id="rows"></div>
-    <div class="ovl">
-      <div class="grp">Overlay (on top of clouds)</div>
-      <div class="row"><label>Enable</label><input type="checkbox" id="ovlOn" checked><div class="spacer"></div></div>
-      <div class="row"><label>Type</label><select id="ovlType"><option value="gradient">Gradient</option><option value="image">Image</option></select></div>
-      <div class="row"><label>Blend</label><select id="ovlBlend">
-        <option value="soft-light" selected>Soft light</option>
-        <option value="overlay">Overlay</option>
-        <option value="multiply">Multiply</option>
-        <option value="screen">Screen</option>
-        <option value="hard-light">Hard light</option>
-        <option value="normal">Normal</option>
-      </select></div>
-      <div class="row" id="ovlImgRow" style="display:none"><label>Image</label><label class="file" for="ovlFile" id="ovlFileLabel">Upload image…</label><input type="file" id="ovlFile" accept="image/*" style="display:none"></div>
-      <div class="crow" id="ovlC1Row"><label>Grad top</label><input type="color" id="ovlC1"><input type="text" class="hex" id="ovlC1Hex"></div>
-      <div class="crow" id="ovlC2Row"><label>Grad bottom</label><input type="color" id="ovlC2"><input type="text" class="hex" id="ovlC2Hex"></div>
-      <div class="row" id="ovlAngRow"><label>Angle</label><input type="range" id="ovlAngle" min="0" max="360" step="1"><input type="number" class="num" id="ovlAngleN" min="0" max="360"></div>
-      <div class="row"><label>Opacity</label><input type="range" id="ovlOpacity" min="0" max="100" step="1"><input type="number" class="num" id="ovlOpacityN" min="0" max="100"></div>
+    <div class="sec open ovl-sec" id="ovlSec">
+      <button class="sec-head"><span>Overlay</span><i class="rule"></i><span class="sec-chev">▸</span></button>
+      <div class="sec-body"><div class="sec-inner">
+        <div class="row"><label>Enable</label><input type="checkbox" id="ovlOn" checked><div class="spacer"></div></div>
+        <div class="row"><label>Type</label><div class="sel" id="ovlType"></div></div>
+        <div class="row"><label>Blend</label><div class="sel" id="ovlBlend"></div></div>
+        <div class="row" id="ovlImgRow" style="display:none"><label>Image</label><label class="file" for="ovlFile" id="ovlFileLabel">Upload image…</label><input type="file" id="ovlFile" accept="image/*" style="display:none"></div>
+        <div class="crow" id="ovlC1Row"><label>Grad top</label><input type="color" id="ovlC1"><input type="text" class="hex" id="ovlC1Hex"></div>
+        <div class="crow" id="ovlC2Row"><label>Grad bottom</label><input type="color" id="ovlC2"><input type="text" class="hex" id="ovlC2Hex"></div>
+        <div class="row" id="ovlAngRow"><label>Angle</label><input type="range" id="ovlAngle" min="0" max="360" step="1"><input type="number" class="num" id="ovlAngleN" min="0" max="360"></div>
+        <div class="row"><label>Opacity</label><input type="range" id="ovlOpacity" min="0" max="100" step="1"><input type="number" class="num" id="ovlOpacityN" min="0" max="100"></div>
+      </div></div>
     </div>
     <div class="footer">
       <button id="exportBtn">Export</button>
       <button id="importBtn">Import</button>
       <button id="swap">Swap S/E</button>
+      <button id="resetBtn">Reset</button>
       <div class="spacer"></div>
       <label>Duration <input id="dur" class="dur" type="number" value="5" step="0.5"> s</label>
       <input type="file" id="importFile" accept="application/json,.json" style="display:none">
     </div>
-    <div class="tip">Toggle <b>Start</b>/<b>End</b> to edit that keyframe with the sliders; the preview shows it. Press <b>Play</b> (or scrub) to see the linear morph between them.</div>
   </div>
 
 <script>
@@ -188,9 +242,9 @@ const PARAMS = [
   {grp:'Colors'},
   {key:'cloudColor',  label:'Cloud color',  type:'color'},
   {key:'shadowColor', label:'Shadow color', type:'color'},
-  {key:'skyTop',      label:'Sky 0% (top)',    type:'color'},
-  {key:'skyMid',      label:'Sky 50%',         type:'color'},
-  {key:'skyBottom',   label:'Sky 100% (bot)',  type:'color'},
+  {key:'skyTop',      label:'Sky 0%',   type:'color'},
+  {key:'skyMid',      label:'Sky 50%',  type:'color'},
+  {key:'skyBottom',   label:'Sky 100%', type:'color'},
   {grp:'Shape'},
   {key:'coverage',  label:'Coverage'},
   {key:'density',   label:'Density'},
@@ -203,7 +257,7 @@ const PARAMS = [
   {key:'stretch',   label:'Stretch'},
   {grp:'Motion & Transform'},
   {key:'phase',  label:'Phase',     min:-200, max:200},
-  {key:'churn',  label:'Churn (翻腾)', min:0, max:200},
+  {key:'churn',  label:'Churn',    min:0, max:200},
   {key:'scale',  label:'Scale (R%)',min:10,   max:200},
   {key:'offsetX',label:'Offset X%', min:0,    max:200},
   {key:'offsetY',label:'Offset Y%', min:0,    max:100},
@@ -217,11 +271,24 @@ let playing=false, looping=true, animT=0, startTime=0, seamless=true;
 function hexToRgb(h){ return [parseInt(h.slice(1,3),16)/255, parseInt(h.slice(3,5),16)/255, parseInt(h.slice(5,7),16)/255]; }
 function lerp(a,b,t){ return a+(b-a)*t; }
 
-// ---------- build controls ----------
+// ---------- build controls (grouped into collapsible sections) ----------
 const rowsEl=document.getElementById('rows');
 const els={};
+const defaultOpen={ 'Colors':true, 'Shape':true, 'Distortion':false, 'Motion & Transform':false };
+let curBody=null;
 for(const p of PARAMS){
-  if(p.grp){ const g=document.createElement('div'); g.className='grp'; g.textContent=p.grp; rowsEl.appendChild(g); continue; }
+  if(p.grp){
+    const sec=document.createElement('div'); sec.className='sec'+(defaultOpen[p.grp]?' open':'');
+    const head=document.createElement('button'); head.className='sec-head';
+    const t=document.createElement('span'); t.textContent=p.grp;
+    const rule=document.createElement('i'); rule.className='rule';
+    const chev=document.createElement('span'); chev.className='sec-chev'; chev.textContent='▸';
+    head.append(t, rule, chev);
+    const body=document.createElement('div'); body.className='sec-body';
+    const inner=document.createElement('div'); inner.className='sec-inner';
+    body.appendChild(inner); sec.append(head, body);
+    rowsEl.appendChild(sec); curBody=inner; continue;
+  }
   if(p.type==='color'){
     const row=document.createElement('div'); row.className='crow';
     const lab=document.createElement('label'); lab.textContent=p.label; row.appendChild(lab);
@@ -230,7 +297,7 @@ for(const p of PARAMS){
     sw.addEventListener('input',()=>{ KF[editing][p.key]=sw.value; hex.value=sw.value.toUpperCase(); animMode=false; });
     hex.addEventListener('input',()=>{ let v=hex.value.trim(); if(!v.startsWith('#'))v='#'+v;
       if(/^#[0-9a-fA-F]{6}$/.test(v)){ KF[editing][p.key]=v; sw.value=v; animMode=false; } });
-    row.appendChild(sw); row.appendChild(hex); rowsEl.appendChild(row);
+    row.appendChild(sw); row.appendChild(hex); curBody.appendChild(row);
     els[p.key]={type:'color',sw,hex};
   } else {
     const min=p.min??0, max=p.max??100;
@@ -240,15 +307,41 @@ for(const p of PARAMS){
     const nm=document.createElement('input'); nm.type='number'; nm.className='num'; nm.min=min; nm.max=max; nm.step=1;
     sl.addEventListener('input',()=>{ KF[editing][p.key]=parseFloat(sl.value); nm.value=sl.value; animMode=false; });
     nm.addEventListener('input',()=>{ let v=parseFloat(nm.value); if(isNaN(v))return; KF[editing][p.key]=v; sl.value=v; animMode=false; });
-    row.appendChild(sl); row.appendChild(nm); rowsEl.appendChild(row);
+    row.appendChild(sl); row.appendChild(nm); curBody.appendChild(row);
     els[p.key]={type:'num',sl,nm};
   }
 }
+// collapse / expand any section header (params + overlay)
+document.getElementById('panel').addEventListener('click', e=>{ const h=e.target.closest('.sec-head'); if(h) h.parentElement.classList.toggle('open'); });
+// custom dropdown factory (replaces native <select> so the open menu is themed)
+function makeSelect(el, opts, onChange, def){
+  el.classList.add('sel'); let value = def!=null?def:opts[0].value;
+  const btn=document.createElement('button'); btn.type='button'; btn.className='sel-btn';
+  const valEl=document.createElement('span'); valEl.className='sel-val';
+  const chev=document.createElement('span'); chev.className='sel-chev'; chev.textContent='▾';
+  btn.append(valEl, chev);
+  const menu=document.createElement('div'); menu.className='sel-menu';
+  opts.forEach(o=>{ const d=document.createElement('div'); d.className='sel-opt'; d.textContent=o.label; d.dataset.v=o.value;
+    d.addEventListener('click', ev=>{ ev.stopPropagation(); setVal(o.value); el.classList.remove('open'); onChange&&onChange(value); });
+    menu.appendChild(d); });
+  el.append(btn, menu);
+  function setVal(v){ value=v; const o=opts.find(x=>x.value===v); valEl.textContent=o?o.label:v;
+    menu.querySelectorAll('.sel-opt').forEach(d=>d.setAttribute('aria-selected', String(d.dataset.v===v))); }
+  btn.addEventListener('click', ev=>{ ev.stopPropagation();
+    document.querySelectorAll('.sel.open').forEach(s=>{ if(s!==el) s.classList.remove('open'); });
+    el.classList.toggle('open'); });
+  setVal(value);
+  return { el, get value(){return value;}, set value(v){ setVal(v); } };
+}
+document.addEventListener('click', ()=>document.querySelectorAll('.sel.open').forEach(s=>s.classList.remove('open')));
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') document.querySelectorAll('.sel.open').forEach(s=>s.classList.remove('open')); });
+function updateTint(){ /* UI kept neutral grayscale — no colour tint */ }
 function syncControls(){
   const kf=KF[editing];
   for(const p of PARAMS){ if(p.grp) continue; const e=els[p.key];
     if(e.type==='color'){ e.sw.value=kf[p.key]; e.hex.value=kf[p.key].toUpperCase(); }
-    else { e.sl.value=kf[p.key]; e.nm.value=kf[p.key]; } }
+    else { e.sl.value=kf[p.key]; e.nm.value=kf[p.key]; fillRange(e.sl); } }
+  updateTint();
 }
 syncControls();
 
@@ -276,8 +369,8 @@ function applyState(s){
   if(s.overlay){ const o=s.overlay;
     if(o.c1!=null){ ovlState.c1=o.c1; ovlC1.value=o.c1; ovlC1Hex.value=o.c1.toUpperCase(); }
     if(o.c2!=null){ ovlState.c2=o.c2; ovlC2.value=o.c2; ovlC2Hex.value=o.c2.toUpperCase(); }
-    if(o.angle!=null){ ovlState.angle=o.angle; ovlAngle.value=o.angle; ovlAngleN.value=o.angle; }
-    if(o.opacity!=null){ ovlState.opacity=o.opacity; ovlOpacity.value=o.opacity; ovlOpacityN.value=o.opacity; }
+    if(o.angle!=null){ ovlState.angle=o.angle; ovlAngle.value=o.angle; ovlAngleN.value=o.angle; fillRange(ovlAngle); }
+    if(o.opacity!=null){ ovlState.opacity=o.opacity; ovlOpacity.value=o.opacity; ovlOpacityN.value=o.opacity; fillRange(ovlOpacity); }
     if(o.imageUrl!==undefined) ovlState.imageUrl=o.imageUrl;
     if(o.type) ovlType.value=o.type;
     if(o.blend) ovlBlend.value=o.blend;
@@ -300,10 +393,20 @@ importFile.addEventListener('change',(e)=>{ const f=e.target.files[0]; if(!f)ret
   rd.onload=()=>{ try{ applyState(JSON.parse(rd.result)); flash(importBtn,'Imported ✓'); }
     catch(err){ flash(importBtn,'Invalid file'); } };
   rd.readAsText(f); importFile.value=''; });
+const OVL_DEFAULT={ enable:true, type:'gradient', blend:'soft-light', c1:'#c2c6ff', c2:'#caff9e', angle:194, opacity:55, imageUrl:null };
+document.getElementById('resetBtn').onclick=()=>{
+  applyState({ start:{...START}, end:{...END}, duration:5, overlay:{...OVL_DEFAULT} });
+  setEditing('start'); flash(document.getElementById('resetBtn'),'Reset ✓');
+};
 
 // ---------- overlay (image / gradient with blend mode, on top of the cloud render) ----------
 const ovl=document.getElementById('overlay');
-const ovlOn=document.getElementById('ovlOn'), ovlType=document.getElementById('ovlType'), ovlBlend=document.getElementById('ovlBlend');
+const ovlOn=document.getElementById('ovlOn');
+const ovlType=makeSelect(document.getElementById('ovlType'),
+  [{value:'gradient',label:'Gradient'},{value:'image',label:'Image'}], applyOverlay, 'gradient');
+const ovlBlend=makeSelect(document.getElementById('ovlBlend'),
+  [{value:'soft-light',label:'Soft light'},{value:'overlay',label:'Overlay'},{value:'multiply',label:'Multiply'},
+   {value:'screen',label:'Screen'},{value:'hard-light',label:'Hard light'},{value:'normal',label:'Normal'}], applyOverlay, 'soft-light');
 const ovlFile=document.getElementById('ovlFile'), ovlFileLabel=document.getElementById('ovlFileLabel');
 const ovlC1=document.getElementById('ovlC1'), ovlC1Hex=document.getElementById('ovlC1Hex');
 const ovlC2=document.getElementById('ovlC2'), ovlC2Hex=document.getElementById('ovlC2Hex');
@@ -328,8 +431,6 @@ function applyOverlay(){
   else { ovl.style.backgroundImage = 'linear-gradient('+ovlState.angle+'deg, '+ovlState.c1+', '+ovlState.c2+')'; }
 }
 ovlOn.addEventListener('change',applyOverlay);
-ovlType.addEventListener('change',applyOverlay);
-ovlBlend.addEventListener('change',applyOverlay);
 ovlC1.addEventListener('input',()=>{ ovlState.c1=ovlC1.value; ovlC1Hex.value=ovlC1.value.toUpperCase(); applyOverlay(); });
 ovlC1Hex.addEventListener('input',()=>{ let v=ovlC1Hex.value.trim(); if(!v.startsWith('#'))v='#'+v; if(/^#[0-9a-fA-F]{6}$/.test(v)){ovlState.c1=v; ovlC1.value=v; applyOverlay();} });
 ovlC2.addEventListener('input',()=>{ ovlState.c2=ovlC2.value; ovlC2Hex.value=ovlC2.value.toUpperCase(); applyOverlay(); });
@@ -345,7 +446,8 @@ applyOverlay();
 const scrub=document.getElementById('scrub'), tval=document.getElementById('tval');
 const playBtn=document.getElementById('play'), loopBtn=document.getElementById('loop'), durInp=document.getElementById('dur');
 function dur(){ return (parseFloat(durInp.value)||1); }
-function setScrub(v,setT){ animT=Math.min(1,Math.max(0,v)); scrub.value=animT; tval.textContent=(animT*dur()).toFixed(2)+'s'; }
+function setScrub(v,setT){ animT=Math.min(1,Math.max(0,v)); scrub.value=animT; tval.textContent=(animT*dur()).toFixed(2)+'s'; fillRange(scrub); }
+function fillRange(el){ if(!el)return; const mn=+el.min||0, mx=(el.max===''?1:+el.max); const p=(mx-mn)?((+el.value-mn)/(mx-mn)*100):0; el.style.setProperty('--p', p+'%'); }
 function pausUI(){ playing=false; playBtn.textContent='► Play'; }
 scrub.addEventListener('input',()=>{ animMode=true; pausUI(); setScrub(parseFloat(scrub.value)); });
 playBtn.onclick=()=>{ animMode=true; playing=!playing; playBtn.textContent=playing?'❚❚ Pause':'► Play';
@@ -357,9 +459,11 @@ seamlessBtn.onclick=()=>{ seamless=!seamless; seamlessBtn.textContent='Seamless:
 
 // ---------- light / dark theme (default light) ----------
 const themeBtn=document.getElementById('themeBtn');
-function setTheme(dark){ document.documentElement.dataset.theme = dark?'dark':''; themeBtn.textContent = dark?'Light':'Dark'; }
+function setTheme(dark){ document.documentElement.dataset.theme = dark?'dark':''; themeBtn.textContent = dark?'Light':'Dark';
+  try{ localStorage.setItem('cs-theme', dark?'dark':'light'); }catch(e){} }
 themeBtn.onclick=()=>setTheme(document.documentElement.dataset.theme!=='dark');
-setTheme(false);
+let _savedTheme='light'; try{ _savedTheme=localStorage.getItem('cs-theme')||'light'; }catch(e){}
+setTheme(_savedTheme==='dark');
 
 // ---------- WebGL ----------
 const canvas=document.getElementById('gl');
@@ -570,6 +674,10 @@ function frame(now){
   }
   requestAnimationFrame(frame);
 }
+// thin-line range fill: keep the ink-filled portion in sync with the value on drag
+document.addEventListener('input', e=>{ if(e.target && e.target.type==='range') fillRange(e.target); });
+document.querySelectorAll('input[type=range]').forEach(fillRange);
+
 setScrub(0);
 requestAnimationFrame(frame);
 </script>
